@@ -5,6 +5,10 @@
 **Goal:** Define a "Infrastructure as Code" approach to managing Virtual Machines across the fleet, moving from manual hypervisor tweaking to declarative policy enforcement.
 
 ---
+existing blog:
+https://github.com/ch-stark/blogvmdeleteprotection/blob/main/index.md
+
+
 
 ## 🏗️ Phase 1: Infrastructure & Lifecycle (Day 0/1)
 *Focus: Ensuring the platform is capable of running VMs consistently across all clusters.*
