@@ -104,3 +104,152 @@ https://github.com/ch-stark/blogvmdeleteprotection/blob/main/index.md
 | **Network (Multus/Bridge)** | High | High (Risk of outage) | **P1** |
 | **Golden Image Sync** | Medium | Medium | **P2** |
 | **VM Update Strategy** | Medium | High (Requires Ansible) | **P3** |
+
+
+
+
+Further ideas:
+
+This is a technically sound and comprehensive list of policies. You have covered the "Big Three" of infrastructure (Compute, Network, Storage) alongside Governance/Lifecycle.
+
+I have reviewed your list for technical accuracy and "made it nice" by standardizing the terminology, removing the trailing commas/typos, and organizing it into a clean, professional catalog suitable for documentation or a presentation.
+
+RHACM Policy Catalog: OpenShift Virtualization
+I. Security & Lifecycle Policies
+Governs the creation, protection, and retirement of Virtual Machines.
+
+Enforce VM Delete Protection
+
+Mode: Enforce
+
+Description: Iterates through all non-system namespaces and automatically applies the kubevirt.io/vm-delete-protection: "True" label to all existing VirtualMachine objects. This acts as a safety barrier against accidental deletion via the UI or CLI.
+
+Audit Missing Delete Protection
+
+Mode: Inform
+
+Description: Monitors the cluster and reports on any VirtualMachine resource that lacks the delete protection label. This provides visibility into the security posture and compliance gaps before strictly enforcing the label cluster-wide.
+
+Restrict Modification of Protection Labels
+
+Mechanism: Gatekeeper / OPA
+
+Description: Blocks specific low-privilege service accounts (e.g., standard operators or developers) from removing the delete protection label. Modification is restricted to requests originating from a designated administrative group (e.g., supervmadmin).
+
+Auto-Prune Stale/Temporary VMs
+
+Mode: Enforce (ComplianceType: MustNotHave)
+
+Description: Automatically deletes Virtual Machines tagged as temporary (e.g., labeled pipeline-created: "true") if their creation timestamp exceeds a defined threshold (e.g., 24 hours), preventing resource sprawl.
+
+Standardize High-Availability Run Strategy
+
+Mode: Enforce
+
+Description: Mandates that critical Virtual Machines utilize runStrategy: Always. This ensures VMs are automatically rescheduled and recreated on a healthy node if the original node fails or is recycled.
+
+II. Resource & Performance Optimization
+Ensures VMs get the compute resources they need without destabilizing the cluster.
+
+Mandate Dedicated CPU Placement
+
+Target: High-Performance Workloads
+
+Description: Enforces that VMs using specialized instance types (e.g., CX series) have dedicatedCpuPlacement: true set. This guarantees CPU pinning and isolates the workload from "noisy neighbors."
+
+Enforce vNUMA Topology
+
+Target: Latency-Sensitive Workloads
+
+Description: Requires that large or high-performance VMs include configuration for vNUMA topology mapping (e.g., spec.domain.cpu.numa). This ensures memory and CPU resources are locally aligned on the physical host for maximum throughput.
+
+Control CPU Overcommitment
+
+Target: HyperConverged CR
+
+Description: Enforces a maximum limit on the vmiCPUAllocationRatio within the HyperConverged Cluster Resource. This strictly balances VM density against performance risks by preventing excessive over-provisioning.
+
+Standardize Instance Types
+
+Description: Mandates that all new VMs utilize an approved VirtualMachineClusterInstancetype. This enforces a baseline configuration profile, standardizing vCPU and memory sizing across managed clusters.
+
+Automate Resource Limits in Quota Namespaces
+
+Description: Enforces automatic calculation of memory limits in namespaces subject to ResourceQuotas. It checks for the alpha.kubevirt.io/auto-memory-limits-ratio label or validates that manual limits satisfy the minimum 100Mi overhead rule.
+
+III. Storage Policies
+Optimizes I/O performance and enables advanced features like Live Migration.
+
+Enforce RWX Access Mode for Migration
+
+Description: Mandates that all VM Persistent Volume Claims (PVCs) intended for live migration utilize the ReadWriteMany (RWX) access mode (or supported Block/RWO shared backends), ensuring data accessibility across nodes during migration.
+
+Prefer Block Volume Mode
+
+Description: Ensures that storage provisioned for VM disks utilizes VolumeMode: Block where supported (e.g., ODF/Ceph RBD). Block mode bypasses the filesystem layer, offering superior I/O performance.
+
+Mandate Windows-Optimized Storage Class
+
+Description: Enforces the usage of a specific StorageClass for Windows VMs (e.g., one with disabled caching or specific sector sizes) to prevent performance degradation and filesystem corruption.
+
+Configure CDI Scratch Space
+
+Target: HyperConverged CR
+
+Description: Enforces a specific scratchSpaceStorageClass to dedicate high-performance storage for temporary Containerized Data Importer (CDI) operations, speeding up image imports and uploads.
+
+Enable Persistent Reservation (SCSI)
+
+Target: HyperConverged CR
+
+Description: Ensures the persistentReservation feature gate is enabled. This allows LUN-backed block mode disks to be shared among multiple VMs, a requirement for Windows Failover Clustering.
+
+IV. Network & Connectivity Policies
+Manages traffic flow, hardware acceleration, and guest introspection.
+
+Enforce Dedicated Migration Network
+
+Target: HyperConverged CR
+
+Description: Verifies the presence of the spec.liveMigrationConfig.network field. This ensures live migration traffic is offloaded to a secondary Multus network, preventing saturation of the primary CNI/Pod network.
+
+Standardize on VirtIO Interfaces
+
+Description: Enforces the use of the virtio NIC model (rejecting e1000e or rtl8139) to maximize network throughput and ensure compatibility with non-x86 architectures like IBM Z and ARM64.
+
+Protect KubeMacPool Assignment
+
+Description: Audits namespaces to ensure KubeMacPool is not disabled (checks for mutatevirtualmachines.kubemacpool.io=ignore). This safeguards the automatic assignment of unique MAC addresses to avoid network conflicts.
+
+Enforce SR-IOV Node Policies
+
+Target: High-Throughput Clusters
+
+Description: Enforces the existence of SriovNetworkNodePolicy objects on relevant nodes. This guarantees that hardware-accelerated SR-IOV Virtual Functions (VFs) are configured and exposed for low-latency VM networking.
+
+Require QEMU Guest Agent Readiness
+
+Description: audits VMs to ensure the QEMU Guest Agent is installed and reporting "Ready." This agent is required for IP address reporting, graceful shutdowns, and application-consistent snapshots.
+
+Implementation Notes & Review
+The "Singleton" Challenge: Several of your policies (8, 14, 15, 16) target the HyperConverged Custom Resource. Since there is usually only one of these per cluster, your ACM Policy must be careful to patch the resource rather than overwrite it, otherwise, you might inadvertently wipe out other local settings.
+
+Gatekeeper Integration (Policy #3): You correctly identified that ACM's standard ConfigurationPolicy cannot easily prevent modification of a label by a specific user. This definitely requires an Admission Controller like OPA Gatekeeper or Kyverno.
+
+Compliance Type: For Policy #4, ensuring the complianceType is set to Mustnothave is crucial. Be careful with the object selector so you don't delete VMs that should exist but just happen to be old. The label selector (pipeline-created: "true") is a critical safety mechanism here.
+
+Would you like me to generate the actual RHACM YAML manifest for any of these specific policies?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
