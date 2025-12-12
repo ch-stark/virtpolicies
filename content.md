@@ -17,7 +17,6 @@
     * Create `Subscription` (Channel: `stable`, Approval: `Automatic`).
 * **Discussion Points:**
     * *Do we version-lock the Operator (Manual approval) or allow auto-upgrades?*
-    * *Do we need different policies for different OpenShift versions?*
 
 ### 2. The "HyperConverged" Config Policy
 * **Goal:** Standardize the behavior of the virtualization engine.
@@ -71,6 +70,27 @@
 
 ---
 
+## 🔄 Phase 4: Day 2 Operations (Handling "Copy Update")
+*Focus: Managing the disconnect between updated Templates and running VMs.*
+
+### 8. The "Recreate" Strategy (For Stateless/Cattle)
+* **Goal:** Ensure VMs referencing a template are always running the latest version.
+* **Mechanism:** GitOps / ArgoCD.
+* **Policy Approach:**
+    * Treat VMs as disposable.
+    * When the `Template` is updated in the policy, trigger a re-sync in ArgoCD to delete/recreate the VM pods.
+    * *Best for:* Worker nodes, CI/CD agents, calculation nodes.
+
+### 9. The "In-Place" Strategy (For Stateful/Pets)
+* **Goal:** Update the OS/App inside long-running VMs without destroying the VM object.
+* **Mechanism:** RHACM integration with **Ansible Automation Platform (AAP)**.
+* **Policy Approach:**
+    * **Pre-hook/Post-hook:** When RHACM detects a policy violation (or on a schedule), trigger an Ansible Job Template.
+    * The Ansible job connects to the VM (via SSH/WinRM) and performs `dnf update` or applies patches.
+    * *Best for:* Databases, Legacy Applications, Windows Servers.
+
+---
+
 ## 📋 Prioritization Matrix
 
 | Policy Idea | Impact | Complexity | Priority |
@@ -78,4 +98,5 @@
 | **Operator Install** | High (Critical) | Low | **P0** |
 | **HyperConverged CR** | High (Critical) | Low | **P0** |
 | **Network (Multus/Bridge)** | High | High (Risk of outage) | **P1** |
-| **Golden Image Sync** | Medium
+| **Golden Image Sync** | Medium | Medium | **P2** |
+| **VM Update Strategy** | Medium | High (Requires Ansible) | **P3** |
