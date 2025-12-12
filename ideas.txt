@@ -1,1 +1,2 @@
-
+* VirtualMachinePreference
+* CNV backup and restore
