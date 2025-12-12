@@ -1,2 +1,3 @@
 * VirtualMachinePreference
 * CNV backup and restore
+* https://github.com/ch-stark/blogvmdeleteprotection/blob/main/index.md
